@@ -1,0 +1,149 @@
+#include <Arduino.h>
+#include <IM920s.h>
+#include <IM920sUtils.h>
+#include <Msd700.h>
+#include <TsubakiMotor.h>
+#include <IM920sDS4Client.h>
+
+#define USB_SERIAL Serial
+#define IM920s_SERIAL Serial2
+
+IM920s im920s(Serial2);
+
+TsubakiMotor leftMotor(32, 33, 25, 21);
+
+const int LEFT_MOTOR_FORWARD_PIN = 32;
+const int LEFT_MOTOR_REVERSE_PIN = 33;
+const int LEFT_MOTOR_PULSE_PIN = 21;
+const int LEFT_MOTOR_ANALOG_PIN = 25;
+
+const int RIGHT_MOTOR_FORWARD_PIN = 0;
+const int RIGHT_MOTOR_REVERSE_PIN = 0;
+const int RIGHT_MOTOR_PULSE_PIN = 0;
+const int RIGHT_MOTOR_ANALOG_PIN = 0;
+
+uint16_t leftMotorRevolutionSpeed = 0;
+uint16_t rightMotorRevolutionSpeed = 0;
+
+String receivedDataArray[6];
+
+String receive = "";
+
+uint8_t leftHatX = 0;
+uint8_t leftHatY = 0;
+uint8_t rightHatX = 0;
+uint8_t rightHatY = 0;
+uint8_t l2Trigger = 0;
+uint8_t r2Trigger = 0;
+
+void im920sReceive();
+
+void leftMotorForward(uint8_t spped);
+void leftMotorReverse(uint8_t speed);
+void leftMotorStop();
+void rightMotorForward(uint8_t speed);
+void rightMotorReverse(uint8_t speed);
+void rightMotorStop();
+
+uint16_t getMotorRevolutionSpeed(const int pulsePin);
+
+void motorControl(const int forwardPin, const int reversePin, const int pulsePin, const int analogPin, uint8_t hatValue);
+
+void setup()
+{
+  USB_SERIAL.begin(115200);
+
+  // IM920s_SERIAL.begin(19200);
+  // IM920s_SERIAL.println("SBRT 7");
+  // IM920s_SERIAL.flush();
+  // IM920s_SERIAL.end();
+  // IM920s_SERIAL.begin(115200);
+  // IM920s_SERIAL.println("DCIO");
+  im920s.begin(19200);
+  im920s.changeBaudrate(7);
+  im920s.disableCharacterMode();
+}
+
+void loop()
+{
+  im920sReceive();
+  motorControl(LEFT_MOTOR_FORWARD_PIN, LEFT_MOTOR_REVERSE_PIN, LEFT_MOTOR_PULSE_PIN, LEFT_MOTOR_ANALOG_PIN, leftHatY);
+}
+
+void im920sReceive()
+{
+  // receive = IM920s_SERIAL.readStringUntil('\n');
+  // receive = receive.substring(receive.lastIndexOf(':') + 1);
+
+  receive = im920s.receivePayload();
+  USB_SERIAL.println(receive);
+
+  if (receive.length() > 0)
+  {
+    for (uint8_t i = 0; i < 6; i++)
+    {
+      receivedDataArray[i] = receive.substring(3 * i, 2 + 3 * i);
+      // USB_SERIAL.print(receivedDataArray[i]);
+    }
+  }
+
+  leftHatX = IM920sUtils::hexStringToUint8_t(receivedDataArray[0]);
+  leftHatY = IM920sUtils::hexStringToUint8_t(receivedDataArray[1]);
+  rightHatX = IM920sUtils::hexStringToUint8_t(receivedDataArray[2]);
+  rightHatY = IM920sUtils::hexStringToUint8_t(receivedDataArray[3]);
+  l2Trigger = IM920sUtils::hexStringToUint8_t(receivedDataArray[4]);
+  r2Trigger = IM920sUtils::hexStringToUint8_t(receivedDataArray[5]);
+
+  USB_SERIAL.print(leftHatX);
+  USB_SERIAL.print(",");
+  USB_SERIAL.print(leftHatY);
+  USB_SERIAL.print(",");
+  USB_SERIAL.print(rightHatX);
+  USB_SERIAL.print(",");
+  USB_SERIAL.print(rightHatY);
+  USB_SERIAL.print(",");
+  USB_SERIAL.print(l2Trigger);
+  USB_SERIAL.print(",");
+  USB_SERIAL.println(r2Trigger);
+}
+
+uint16_t getMotorRevolutionSpeed(const int pulsePin)
+{
+  uint32_t pulsePeriod = 0;
+
+  pulsePeriod = 2 * pulseIn(pulsePin, LOW, 300);
+  return 4e6 / pulsePeriod;
+}
+
+void motorControl(const int forwardPin, const int reversePin, const int pulsePin, const int analogPin, uint8_t hatValue)
+{
+  pinMode(forwardPin, OUTPUT);
+  pinMode(reversePin, OUTPUT);
+  pinMode(pulsePin, INPUT_PULLUP);
+
+  float joystickInputPercentage = (hatValue - 128) / 128.0;
+  Serial.println(joystickInputPercentage);
+
+  if (-0.15 <= joystickInputPercentage & joystickInputPercentage <= 0.15) // joystickの入力が±2以下のときモーターを停止
+  {
+    digitalWrite(forwardPin, LOW);
+    digitalWrite(reversePin, LOW);
+    digitalWrite(analogPin, LOW);
+  }
+  else
+  {
+    if (joystickInputPercentage > 0) // 正転
+    {
+      digitalWrite(reversePin, LOW);
+      digitalWrite(forwardPin, HIGH);
+      dacWrite(analogPin, int(256 * joystickInputPercentage));
+    }
+    else if (joystickInputPercentage < 0) // 逆転
+    {
+      digitalWrite(forwardPin, LOW);
+      digitalWrite(reversePin, HIGH);
+      dacWrite(analogPin, int(256 * joystickInputPercentage * -1));
+    }
+  }
+  delay(1);
+}
