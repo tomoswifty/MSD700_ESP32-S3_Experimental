@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <IM920s.h>
-#include <IM920sDS4Client.h>
+// #include <IM920sDS4Client.h>
 #include <JetsonAutoControl.h>
 #include <Msd700.h>
 
@@ -11,7 +11,7 @@
 Msd700 msd700(35, 36, 10, 40, 39, 9);
 
 IM920s im920s(IM920s_SERIAL);
-IM920sDS4Client dualshock4;
+// IM920sDS4Client dualshock4;
 
 JetsonAutoControl jetson;
 
@@ -22,13 +22,13 @@ void setup()
   USB_SERIAL.begin(115200);
   USB_SERIAL.setTimeout(50);
 
-  im920s.begin(19200, SERIAL_8N1, 4, 5);
+  im920s.begin(115200, SERIAL_8N1, 4, 5);
   // im920s.changeBaudrate(7);
   im920s.disableCharacterMode();
 
-  dualshock4.setTimeoutThreshold(100);
-  dualshock4.setLeftHatDeadZone(32, 32);
-  dualshock4.setRightHatDeadZone(32, 32);
+  // dualshock4.setTimeoutThreshold(100);
+  // dualshock4.setLeftHatDeadZone(32, 32);
+  // dualshock4.setRightHatDeadZone(32, 32);
 
   Wire.setPins(47, 21);
   Wire.begin();
@@ -36,8 +36,8 @@ void setup()
 
 void loop()
 {
-  String payload = im920s.receivePayload();
-  dualshock4.parse(payload);
+  // String payload = im920s.receivePayload();
+  // dualshock4.parse(payload);
   // USB_SERIAL.println(payload);
 
   // Serial.print(msd700.getLeftMotorRevolutionSpeed());
@@ -47,17 +47,11 @@ void loop()
   String string = Serial.readStringUntil('\n');
   jetson.parse(string);
 
-  // if (string.length() > 1)
-  // {
-  //   Serial1.print("TXDA ");
-  //   Serial1.print("Data from jetson:");
-  //   Serial1.print(jetson.getVelocityInDirectionOfTravel());
-  //   Serial1.print(";");
-  //   Serial1.print(jetson.getAngularVelocity());
-  //   Serial1.println("");
-  // }
-
   msd700.travelByInverseKinematics(jetson.getVelocityInDirectionOfTravel(), jetson.getAngularVelocity());
+  // Serial1.print(jetson.getVelocityInDirectionOfTravel());
+  // Serial1.print(",");
+  // Serial1.print(jetson.getAngularVelocity());
+  // Serial1.print("\n");
   // if (autoControlEnable)
   // {
   // }
